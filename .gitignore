@@ -1,0 +1,9 @@
+build/*
+build-debug/*
+build-relwithdebinfo/*
+CMakeUserPresets.json
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.polyscope.ini
+imgui.ini

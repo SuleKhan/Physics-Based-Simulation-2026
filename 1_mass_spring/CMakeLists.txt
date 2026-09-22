@@ -1,0 +1,1 @@
+add_pbs_exercise(1_mass_spring)

@@ -1,0 +1,39 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/cpp
+{
+	"name": "pbs26",
+	"dockerFile": "Dockerfile",
+
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-vscode.cpptools-extension-pack"
+			]
+		}
+	},
+
+	// GLFW 3.4 compiles both windowing backends and chooses at runtime: Wayland
+	// when WAYLAND_DISPLAY names a socket it can reach, X11 otherwise. Both are
+	// wired up here so the container works whichever kind of session the host
+	// runs, and a host with no Wayland simply falls through to X11.
+	//
+	// XDG_RUNTIME_DIR is remapped because the host's runtime directory is
+	// mounted below at a fixed path; libwayland looks for its socket there.
+	"containerEnv": {
+		"DISPLAY": "${localEnv:DISPLAY}",
+		"WAYLAND_DISPLAY": "${localEnv:WAYLAND_DISPLAY}",
+		"XDG_RUNTIME_DIR": "/tmp/xdg-runtime"
+	},
+
+	"mounts": [
+		"source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind,consistency=cached",
+		"source=${localEnv:XDG_RUNTIME_DIR},target=/tmp/xdg-runtime,type=bind,consistency=cached"
+	]
+
+	// Optional: uncomment for hardware-accelerated rendering. Without it Mesa
+	// falls back to software rasterisation, which is noticeably slower. Left off
+	// by default because the container fails to start on hosts with no DRI
+	// device, which includes some virtual machines.
+	//
+	// "runArgs": ["--device=/dev/dri"]
+}
