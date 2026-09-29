@@ -64,3 +64,4 @@ target_compile_options(pbs_common PUBLIC
 include(PBSExercise)
 
 add_subdirectory(1_mass_spring)
+add_subdirectory(2_fem)

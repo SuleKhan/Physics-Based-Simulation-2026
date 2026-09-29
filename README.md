@@ -88,7 +88,9 @@ Run an exercise:
 ```
 
 Each exercise builds as `<name>` from the sources in its `template/`
-directory, which is where your implementation goes.
+directory, which is where your implementation goes. Once the solution to an
+exercise has been released it also builds as `<name>_solution`, so you can
+compare your implementation against it.
 
 Remember to re-run `cmake --preset release` after pulling updates.
 
