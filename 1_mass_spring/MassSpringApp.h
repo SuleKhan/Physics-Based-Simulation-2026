@@ -27,6 +27,10 @@ public:
     Vector3F m_spring_start = Vector3F::Zero();
     Vector3F m_position = Vector3F(0, -3.0, 0);
     Vector3F m_velocity = Vector3F::Zero();
+    Vector3F m_pos0 = Vector3F(0, -3.0, 0);
+    Vector3F m_vel0 = Vector3F::Zero();
+
+    double alpha = 0.0, beta = 0.0, c1 = 0.0, c2 = 0.0;
 
     double m_time = 0.0;
     std::vector<Vector3F> m_trajectory;

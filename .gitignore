@@ -7,3 +7,4 @@ CMakeUserPresets.json
 !.vscode/extensions.json
 .polyscope.ini
 imgui.ini
+.vs/
