@@ -65,3 +65,4 @@ include(PBSExercise)
 
 add_subdirectory(1_mass_spring)
 add_subdirectory(2_fem)
+add_subdirectory(3_fluid)
