@@ -1,17 +1,48 @@
 #include "../FEMApp.h"
 
-void FEMApp::computeGradientFD(const VectorXF &x, VectorXF &gradient, double eps)
+void FEMApp::computeGradientFD(const VectorXF& x, VectorXF& gradient, double eps)
 {
-    // TODO: Complete the finite difference approximation of the gradient.
-    // grad_FD(i) = (f(x + eps * e_i)-f(x - eps * e_i))/(2 * eps);
-    // Use the function objectiveFunction to compute f(x).
     gradient = VectorXF::Zero(x.size());
+
+    for (int i = 0; i < x.size(); ++i)
+    {
+        VectorXF x_plus = x;
+        VectorXF x_minus = x;
+
+        x_plus(i) += eps;
+        x_minus(i) -= eps;
+
+        double E_plus = 0.0;
+        double E_minus = 0.0;
+
+        objectiveFunction(x_plus, E_plus);
+        objectiveFunction(x_minus, E_minus);
+
+        gradient(i) = (E_plus - E_minus) / (2.0 * eps);
+    }
 }
 
-void FEMApp::computeHessianFD(const VectorXF &x, MatrixXF &H, double eps)
+void FEMApp::computeHessianFD(const VectorXF& x, MatrixXF& H, double eps)
 {
-    // TODO: Complete the finite difference computation for the Hessian.
-    // hess_FD(i,j) = (grad(x + eps * e_j)(i) - grad(x - eps * e_j)(i)) / (2 * eps);
-    // You can use computeGradientFD or objectiveGradient to compute gradients.
     H = MatrixXF::Zero(x.size(), x.size());
+
+    for (int j = 0; j < x.size(); ++j)
+    {
+        VectorXF x_plus = x;
+        VectorXF x_minus = x;
+
+        x_plus(j) += eps;
+        x_minus(j) -= eps;
+
+        VectorXF grad_plus;
+        VectorXF grad_minus;
+
+        computeGradientFD(x_plus, grad_plus, eps);
+        computeGradientFD(x_minus, grad_minus, eps);
+
+        for (int i = 0; i < x.size(); ++i)
+        {
+            H(i, j) = (grad_plus(i) - grad_minus(i)) / (2.0 * eps);
+        }
+    }
 }

@@ -1,22 +1,28 @@
 #include "../FEMApp.h"
 
-void FEMApp::addGravityEnergy(const VectorXF &x, double &E)
+void FEMApp::addGravityEnergy(const VectorXF& x, double& E)
 {
-    /// TODO: Implement gravitational potential energy.
-    /// Make sure not to overwrite E, but add to it!
-    E += 0.0;
+    for (int i = 0; i < x.size() / 2; ++i)
+    {
+        Vector2F xi = x.segment<2>(2 * i);
+        double mass = M(2 * i);
+
+        E += -mass * gravity.dot(xi);
+    }
 }
 
-void FEMApp::addGravityGradient(const VectorXF &x, VectorXF &gradient)
+void FEMApp::addGravityGradient(const VectorXF& x, VectorXF& gradient)
 {
-    /// TODO: Implement gradient of gravitational potential energy.
-    /// Make sure not to overwrite gradient, but add to it!
-    gradient += VectorXF::Zero(x.size());
+    for (int i = 0; i < x.size() / 2; ++i)
+    {
+        double mass = M(2 * i);
+
+        gradient.segment<2>(2 * i) += -mass * gravity;
+    }
 }
 
-void FEMApp::addGravityHessian(const VectorXF &x, TripletListF &hessian_triplets)
+void FEMApp::addGravityHessian(const VectorXF& x, TripletListF& hessian_triplets)
 {
-    /// TODO: Implement Hessian of gravitational potential energy.
-    /// Add hessian entries using hessian_triplets.emplace_back(row, col, value);
-    hessian_triplets.emplace_back(0, 0, 0.0);
+    (void)x;
+    (void)hessian_triplets;
 }
