@@ -9,62 +9,66 @@ void FluidApp::solvePoisson()
     double residual = m_tolerance + 1; // initial residual
     double rho = 1;
 
-    Array2d &p = p_pressure.x();
+    Array2d& p = p_pressure.x();
 
-    for (int it = 0; residual > m_tolerance && it < m_max_iter; ++it)
+    for (int it = 0; it < m_max_iter; ++it)
     {
-        // Note that the boundaries are handles by the framework, so you iterations should be similar to:
+        // Gauss-Seidel sweep (in place, so new values are used as soon as available)
         for (int y = 1; y < m_res_y - 1; ++y)
         {
             for (int x = 1; x < m_res_x - 1; ++x)
             {
-                double b = -p_divergence.x()(x, y) / m_dt * rho; // right-hand
-                                                                 // TODO: update the pressure values
+                double b = -p_divergence.x()(x, y) / m_dt * rho; // right-hand side
+
+                p(x, y) = (p(x + 1, y) + p(x - 1, y) +
+                    p(x, y + 1) + p(x, y - 1) -
+                    dx2 * b) / 4.0;
             }
         }
 
-        // Compute the new residual, i.e. the sum of the squares of the individual residuals (squared L2-norm)
+        // Residual: squared L2-norm of (b - A p)
         residual = 0;
         for (int y = 1; y < m_res_y - 1; ++y)
         {
             for (int x = 1; x < m_res_x - 1; ++x)
             {
-                double b = -p_divergence.x()(x, y) / m_dt * rho; // right-hand
-                // TODO: compute the cell residual
-                double cellResidual = 0.0;
+                double b = -p_divergence.x()(x, y) / m_dt * rho; // right-hand side
+
+                double lhs = (p(x + 1, y) + p(x - 1, y) +
+                    p(x, y + 1) + p(x, y - 1) -
+                    4.0 * p(x, y)) / dx2;
+                double cellResidual = b - lhs;
 
                 residual += cellResidual * cellResidual;
             }
         }
 
-        // Get the L2-norm of the residual
+        // L2-norm of the residual
         residual = sqrt(residual);
 
-        // We assume the accuracy is meant for the average L2-norm per grid cell
+        // Average per grid cell
         residual /= (m_res_x - 2) * (m_res_y - 2);
 
-        //// For your debugging, and ours, please add these prints after every iteration
         // cout << "Pressure solver: iter=" << it << ", res=" << residual << endl;
     }
 }
 
 void FluidApp::correctVelocity()
 {
+    double rho = 1.0;
     Array2d &p = p_pressure.x();
     Array2d &u = p_velocity.x();
     Array2d &v = p_velocity.y();
 
     // Note: velocity u_{i+1/2} is practically stored at i+1, hence xV_{i}  -= dt * (p_{i} - p_{i-1}) / dx
+    // u stored at x means u_{x-1/2}
     for (int y = 1; y < m_res_y - 1; ++y)
         for (int x = 1; x < m_res_x; ++x)
-            // TODO: update u
-            u(x, y) = u(x, y);
+            u(x, y) -= m_dt / rho * (p(x, y) - p(x - 1, y)) / m_dx;
 
-    // Same for velocity v_{i+1/2}.
     for (int y = 1; y < m_res_y; ++y)
         for (int x = 1; x < m_res_x - 1; ++x)
-            // TODO: update v
-            v(x, y) = v(x, y);
+            v(x, y) -= m_dt / rho * (p(x, y) - p(x, y - 1)) / m_dx;
 }
 
 void FluidApp::advectValues()
@@ -98,13 +102,13 @@ void FluidApp::advectDensitySL(const Array2d &u, const Array2d &v)
     {
         for (int x = 1; x < m_res_x - 1; ++x)
         {
-            // TODO: Compute the velocity
-            double last_x_velocity = 0.;
-            double last_y_velocity = 0.;
+            // TODO: Compute the velocity (at cell center)
+            double last_x_velocity = 0.5 * (u(x, y) + u(x + 1, y));
+            double last_y_velocity = 0.5 * (v(x, y) + v(x, y + 1));
 
             // TODO: Find the last position of the particle (in grid coordinates)
-            double last_x = 0.;
-            double last_y = 0.;
+            double last_x = x - m_dt * last_x_velocity / m_dx;
+            double last_y = y - m_dt * last_y_velocity / m_dx;
 
             // Make sure the coordinates are inside the boundaries
             // Densities are known between 1 and res-2
@@ -128,7 +132,12 @@ void FluidApp::advectDensitySL(const Array2d &u, const Array2d &v)
             double y_weight = last_y - y_low;
 
             // TODO: Bilinear interpolation
-            d_tmp(x, y) = d(x, y);
+            // TODO: Bilinear interpolation
+            d_tmp(x, y) =
+                (1 - x_weight) * (1 - y_weight) * d(x_low, y_low) +
+                x_weight * (1 - y_weight) * d(x_high, y_low) +
+                (1 - x_weight) * y_weight * d(x_low, y_high) +
+                x_weight * y_weight * d(x_high, y_high);
         }
     }
 
@@ -150,12 +159,13 @@ void FluidApp::advectVelocitySL(const Array2d &u, const Array2d &v)
         for (int x = 1; x < m_res_x; ++x)
         {
             // TODO: Compute the velocity
-            double last_x_velocity = 0.;
-            double last_y_velocity = 0.;
+            double last_x_velocity = u(x, y);
+            double last_y_velocity = 0.25 * (v(x - 1, y) + v(x, y) +
+                v(x - 1, y + 1) + v(x, y + 1));
 
             // TODO: Find the last position of the particle (in grid coordinates)
-            double last_x = 0.;
-            double last_y = 0.;
+            double last_x = x - m_dt * last_x_velocity / m_dx;
+            double last_y = y - m_dt * last_y_velocity / m_dx;
 
             // Make sure the coordinates are inside the boundaries
             // Being conservative, one can say that the velocities are known between 1.5 and res-2.5
@@ -180,7 +190,11 @@ void FluidApp::advectVelocitySL(const Array2d &u, const Array2d &v)
             double y_weight = last_y - y_low;
 
             // TODO: Bilinear interpolation
-            u_tmp(x, y) = u(x, y);
+            u_tmp(x, y) =
+                (1 - x_weight) * (1 - y_weight) * u_in(x_low, y_low) +
+                x_weight * (1 - y_weight) * u_in(x_high, y_low) +
+                (1 - x_weight) * y_weight * u_in(x_low, y_high) +
+                x_weight * y_weight * u_in(x_high, y_high);
         }
     }
 
@@ -190,12 +204,13 @@ void FluidApp::advectVelocitySL(const Array2d &u, const Array2d &v)
         for (int x = 1; x < m_res_x - 1; ++x)
         {
             // TODO: Compute the velocity
-            double last_x_velocity = 0.;
-            double last_y_velocity = 0.;
+            double last_x_velocity = 0.25 * (u(x, y - 1) + u(x + 1, y - 1) +
+                u(x, y) + u(x + 1, y));
+            double last_y_velocity = v(x, y);
 
             // TODO: Find the last position of the particle (in grid coordinates)
-            double last_x = 0.;
-            double last_y = 0.;
+            double last_x = x - m_dt * last_x_velocity / m_dx;
+            double last_y = y - m_dt * last_y_velocity / m_dx;
 
             // Make sure the coordinates are inside the boundaries
             // Being conservative, one can say that the velocities are known between 1.5 and res-2.5
@@ -220,7 +235,11 @@ void FluidApp::advectVelocitySL(const Array2d &u, const Array2d &v)
             double y_weight = last_y - y_low;
 
             // TODO: Bilinear interpolation
-            v_tmp(x, y) = v(x, y);
+            v_tmp(x, y) =
+                (1 - x_weight) * (1 - y_weight) * v_in(x_low, y_low) +
+                x_weight * (1 - y_weight) * v_in(x_high, y_low) +
+                (1 - x_weight) * y_weight * v_in(x_low, y_high) +
+                x_weight * y_weight * v_in(x_high, y_high);
         }
     }
 
@@ -248,18 +267,15 @@ void FluidApp::MacCormackUpdate(const Array2d &d, const Array2d &d_forward, cons
     // MacCormack Update
     for (int y = 1; y < m_res_y - 1; ++y)
         for (int x = 1; x < m_res_x - 1; ++x)
-            // TODO: update d
-            d_tmp(x, y) = d_tmp(x, y);
+            d_tmp(x, y) = d_forward(x, y) + 0.5 * (d(x, y) - d_backward(x, y));
 
     for (int y = 1; y < m_res_y - 1; ++y)
         for (int x = 1; x < m_res_x; ++x)
-            // TODO: update u
-            u_tmp(x, y) = u_tmp(x, y);
+            u_tmp(x, y) = u_forward(x, y) + 0.5 * (u(x, y) - u_backward(x, y));
 
     for (int y = 1; y < m_res_y; ++y)
         for (int x = 1; x < m_res_x - 1; ++x)
-            // TODO: update v
-            v_tmp(x, y) = v_tmp(x, y);
+            v_tmp(x, y) = v_forward(x, y) + 0.5 * (v(x, y) - v_backward(x, y));
 
     p_density.x() = d_tmp;
     p_velocity.x() = u_tmp;
@@ -276,13 +292,11 @@ void FluidApp::MacCormackClamp(const Array2d &d, const Array2d &d_forward, const
     {
         for (int x = 1; x < m_res_x - 1; ++x)
         {
-            // TODO: Compute the velocity
-            double last_x_velocity = 0.;
-            double last_y_velocity = 0.;
+            double last_x_velocity = 0.5 * (u(x, y) + u(x + 1, y));
+            double last_y_velocity = 0.5 * (v(x, y) + v(x, y + 1));
 
-            // TODO: Find the last position of the particle (in grid coordinates)
-            double last_x = 0.;
-            double last_y = 0.;
+            double last_x = x - m_dt * last_x_velocity / m_dx;
+            double last_y = y - m_dt * last_y_velocity / m_dx;
 
             // Make sure the coordinates are inside the boundaries
             // Densities are known between 1 and res-2
@@ -315,7 +329,9 @@ void FluidApp::MacCormackClamp(const Array2d &d, const Array2d &d_forward, const
             d_max = std::max(d(x_high, y_high), d_max);
 
             // TODO: clamp d
-            d_tmp(x, y) = d_tmp(x, y);
+            // clamp d
+            if (d_tmp(x, y) < d_min || d_tmp(x, y) > d_max)
+                d_tmp(x, y) = d_forward(x, y);
         }
     }
 
@@ -325,12 +341,12 @@ void FluidApp::MacCormackClamp(const Array2d &d, const Array2d &d_forward, const
         for (int x = 1; x < m_res_x; ++x)
         {
             // TODO: Compute the velocity
-            double last_x_velocity = 0.;
-            double last_y_velocity = 0.;
+            double last_x_velocity = u(x, y);
+            double last_y_velocity = 0.25 * (v(x - 1, y) + v(x, y) +
+                v(x - 1, y + 1) + v(x, y + 1));
 
-            // TODO: Find the last position of the particle (in grid coordinates)
-            double last_x = 0.;
-            double last_y = 0.;
+            double last_x = x - m_dt * last_x_velocity / m_dx;
+            double last_y = y - m_dt * last_y_velocity / m_dx;
 
             // Make sure the coordinates are inside the boundaries
             // Being conservative, one can say that the velocities are known between 1.5 and res-2.5
@@ -364,7 +380,9 @@ void FluidApp::MacCormackClamp(const Array2d &d, const Array2d &d_forward, const
             u_max = std::max(u(x_high, y_high), u_max);
 
             // TODO: clamp u
-            u_tmp(x, y) = u_tmp(x, y);
+            // clamp u
+            if (u_tmp(x, y) < u_min || u_tmp(x, y) > u_max)
+                u_tmp(x, y) = u_forward(x, y);
         }
     }
 
@@ -374,12 +392,12 @@ void FluidApp::MacCormackClamp(const Array2d &d, const Array2d &d_forward, const
         for (int x = 1; x < m_res_x - 1; ++x)
         {
             // TODO: Compute the velocity
-            double last_x_velocity = 0.;
-            double last_y_velocity = 0.;
+            double last_x_velocity = 0.25 * (u(x, y - 1) + u(x + 1, y - 1) +
+                u(x, y) + u(x + 1, y));
+            double last_y_velocity = v(x, y);
 
-            // TODO: Find the last position of the particle (in grid coordinates)
-            double last_x = 0.;
-            double last_y = 0.;
+            double last_x = x - m_dt * last_x_velocity / m_dx;
+            double last_y = y - m_dt * last_y_velocity / m_dx;
 
             // Make sure the coordinates are inside the boundaries
             // Being conservative, one can say that the velocities are known between 1.5 and res-2.5
@@ -413,7 +431,9 @@ void FluidApp::MacCormackClamp(const Array2d &d, const Array2d &d_forward, const
             v_max = std::max(v(x_high, y_high), v_max);
 
             // TODO: clamp v
-            v_tmp(x, y) = v_tmp(x, y);
+            // clamp v
+            if (v_tmp(x, y) < v_min || v_tmp(x, y) > v_max)
+                v_tmp(x, y) = v_forward(x, y);
         }
     }
 
